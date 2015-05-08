@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 # This is just a library file for the spritesheetpacker.py executable
 
 from PIL import Image
