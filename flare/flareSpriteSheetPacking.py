@@ -154,7 +154,7 @@ def markDuplicates(images):
     gid=0
     for im in images:
         im["gid"] = gid
-        im["imagehash"] = sha.sha(im["image"].tostring()).hexdigest()
+        im["imagehash"] = sha.sha(im["image"].tobytes()).hexdigest()
         gid += 1
 
     for im1 in images:
