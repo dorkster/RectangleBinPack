@@ -13,9 +13,9 @@ if __name__ == "__main__":
     parser.add_argument('--definition', help = 'path to a definition file.', dest = 'definition',
                 metavar = 'path', type = type(""), nargs = 1, required = True)
 
-    parser.add_argument('--resize', action = 'store_true', default = False)
+    parser.add_argument('--resize', help = 'resizes the animation to 50%% of its original size', action = 'store_true', default = False)
 
-    parser.add_argument('--save-always', dest = "save_always", action = 'store_true', default = False)
+    parser.add_argument('--save-always', dest = "save_always", help = 'saves the animation and image even if the new size is not smaller', action = 'store_true', default = False)
 
     args = parser.parse_args()
     if args.mod is None or args.definition is None:
