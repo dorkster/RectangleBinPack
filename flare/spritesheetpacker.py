@@ -10,29 +10,47 @@ if __name__ == "__main__":
     parser.add_argument('--mod', help = 'path to mod folder.', dest = 'mod',
                 metavar = 'path', type = type(""), nargs = 1, required = True)
 
-    parser.add_argument('--definition', help = 'path to a definition file.', dest = 'definition',
-                metavar = 'path', type = type(""), nargs = 1, required = True)
+    parser.add_argument('--animation', help = 'path to a animation file.', dest = 'animation',
+                metavar = 'path', type = type(""), nargs = 1)
+
+    parser.add_argument('--tileset', help = 'path to a tileset file.', dest = 'tileset',
+                metavar = 'path', type = type(""), nargs = 1)
 
     parser.add_argument('--resize', help = 'resizes the animation to 50%% of its original size', action = 'store_true', default = False)
 
     parser.add_argument('--save-always', dest = "save_always", help = 'saves the animation and image even if the new size is not smaller', action = 'store_true', default = False)
 
     args = parser.parse_args()
-    if args.mod is None or args.definition is None:
-        print "Definition and mod path must be supplied."
+    if args.mod is None and (args.animation is None or args.tileset is None):
+        print "Animation/tileset and mod path must be supplied."
+        exit(1)
+    elif args.animation is not None and args.tileset is not None:
+        print "Can't resize both an animation and a tileset. Aborting."
         exit(1)
     else:
         mod = args.mod[0]
-        animname = args.definition[0]
         imgname = None
-        with open(animname) as f:
+
+        animname = None
+        tilesetname = None
+        defname = None
+        if args.animation is not None:
+            defname = animname = args.animation[0]
+        elif args.tileset is not None:
+            defname = tilesetname = args.tileset[0]
+
+        with open(defname) as f:
             for line in f.readlines():
-                if line.startswith('image='):
+                if (animname is not None and line.startswith('image=')) or (tilesetname is not None and line.startswith('img=')):
                     imgname=mod + '/' + (line.split('=')[1]).rstrip('\n')
         if imgname == None:
-            print 'No image path found in the spritesheet definition:', animname
+            print 'No image path found in the spritesheet definition:', defname
             exit(1)
-        imgrects, additionalinformation = flareSpriteSheetPacking.parseAnimationFile(animname, imgname)
+
+        if animname is not None:
+            imgrects, additionalinformation = flareSpriteSheetPacking.parseAnimationFile(animname, imgname)
+        elif tilesetname is not None:
+            imgrects, additionalinformation = flareSpriteSheetPacking.parseTilesetFile(tilesetname, imgname)
 
         imgs = flareSpriteSheetPacking.markDuplicates(imgrects)
 
@@ -48,4 +66,7 @@ if __name__ == "__main__":
 
         if args.save_always or (size[0] * size[1] < oldsize[0] * oldsize[1]):
             flareSpriteSheetPacking.writeImageFile(imgname, imgrects, size)
-            flareSpriteSheetPacking.writeAnimationfile(animname, imgrects, additionalinformation)
+            if animname is not None:
+                flareSpriteSheetPacking.writeAnimationfile(animname, imgrects, additionalinformation)
+            elif tilesetname is not None:
+                flareSpriteSheetPacking.writeTilesetFile(tilesetname, imgrects, additionalinformation)

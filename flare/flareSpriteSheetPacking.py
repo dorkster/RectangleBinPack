@@ -149,6 +149,86 @@ def parseAnimationFile(fname, imgname):
         images += processNextSection()
     return images, additionalinformation
 
+def parseTilesetFile(fname, imgname):
+    images = []
+    img = Image.open(imgname)
+    print 'processing ', imgname
+
+    tileset = open(fname, 'r')
+    lines = tileset.readlines();
+    tileset.close()
+
+    additionalinformation = {}
+    additionalinformation["original_image_size"] = img.size
+
+    for line in lines:
+        if line.startswith("img="):
+            imgname = line.split("=")[1] # keep this information to write out again!
+            additionalinformation["imagename"] = imgname
+
+        if line.startswith("tile="):
+            vals = line.split("=")[1].split(",")
+            index = int(vals[0])
+            x = orig_x = int(vals[1])
+            y = orig_y = int(vals[2])
+            w = x + int(vals[3])
+            h = y + int(vals[4])
+            render_offset_x = int(vals[5])
+            render_offset_y = int(vals[6])
+            oldrect = imgrect = (x, y, w, h)
+            partimg = img.copy().crop(imgrect)
+            bbox = partimg.split()[partimg.getbands().index('A')].getbbox()
+            newimg = partimg.crop(bbox)
+
+            if bbox is None:
+                print "Warning in: ",imgname.strip('\n')
+                print "* skipping empty image at ",(x, y, w, h), '\n'
+            else:
+                f = {
+                    "index" : index,
+                    "renderoffset" : (render_offset_x-bbox[0], render_offset_y-bbox[1]),
+                    "image" : newimg,
+                    "duration" : None, # animation only
+                    "oldrect" : oldrect, # animations can't be packed, so we'll need to restore the old size if this tile is an animation
+                    "oldoffset" : (render_offset_x, render_offset_y),
+                }
+                images += [f]
+
+        if line.startswith("animation"):
+            animtile = None
+            # line += ";"
+            if not line.endswith(";\n"):
+                line = line.rstrip("\n") + ";\n"
+            vals = line.split("=")[1].split(";")
+            if len(vals) >= 1:
+                animtile = filter(lambda s: s["index"] == int(vals[0]), images)
+            else:
+                continue
+
+            if animtile is not None:
+                animtile[0]["image"] = img.copy().crop(animtile[0]["oldrect"])
+                animtile[0]["renderoffset"] = animtile[0]["oldoffset"]
+                valstart = iter(vals)
+                next(valstart) # skip the index
+                for animframe in valstart:
+                    frame = animframe.split(",")
+                    if len(frame) is not 3:
+                        break
+                    # tile animations don't support varrying width/height, so don't crop
+                    imgrect = (int(frame[0]), int(frame[1]), int(frame[0]) + animtile[0]["image"].size[0], int(frame[1]) + animtile[0]["image"].size[1])
+                    newimg = img.copy().crop(imgrect)
+                    f = {
+                        "index" : index,
+                        "renderoffset" : None, # tile only
+                        "image" : newimg,
+                        "duration" : frame[2],
+                        "oldrect" : None, # tile only
+                        "oldoffset" : None, # tile only
+                    }
+                    images += [f]
+
+    return images, additionalinformation
+
 def markDuplicates(images):
     # assign global unique ids to each image:
     gid=0
@@ -294,6 +374,35 @@ def writeAnimationfile(animname, images, additionalinformation):
     write_section(firstsection)
     for section in sectionnames:
         write_section(section)
+    f.close()
+
+def writeTilesetFile(animname, images, additionalinformation):
+    w, h = 0, 0
+    for n in images:
+        w = max(n["x"]+n["image"].size[0], w)
+        h = max(n["y"]+n["image"].size[1], h)
+
+    f = open(animname,'w')
+
+    if "imagename" in additionalinformation:
+        f.write("\n")
+        f.write("img="+additionalinformation["imagename"])
+        # f.write("\n")
+
+    prevanimindex = None
+    for x in images:
+        if x["duration"] is None:
+            f.write("\n")
+            f.write("tile=" + str(x["index"]) + "," + str(x["x"]) + "," + str(x["y"]) + "," + str(x["image"].size[0]) + "," + str(x["image"].size[1]) + "," + str(x["renderoffset"][0]) + "," + str(x["renderoffset"][1]))
+            prevanimindex = None
+        else:
+            if prevanimindex is not x["index"]:
+                f.write("\n")
+                f.write("animation=" + str(x["index"]) + ";")
+                prevanimindex = x["index"]
+            else:
+                f.write(str(x["x"]) + "," + str(x["y"]) + "," + x["duration"] + ";")
+
     f.close()
 
 
