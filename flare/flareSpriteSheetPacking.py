@@ -160,6 +160,7 @@ def parseTilesetFile(fname, imgname):
 
     additionalinformation = {}
     additionalinformation["original_image_size"] = img.size
+    additionalinformation["animations"] = {}
 
     for line in lines:
         if line.startswith("img="):
@@ -188,7 +189,7 @@ def parseTilesetFile(fname, imgname):
                     "index" : index,
                     "renderoffset" : (render_offset_x-bbox[0], render_offset_y-bbox[1]),
                     "image" : newimg,
-                    "duration" : None, # animation only
+                    "imagehash" : sha.sha(newimg.tobytes()).hexdigest(),
                     "oldrect" : oldrect, # animations can't be packed, so we'll need to restore the old size if this tile is an animation
                     "oldoffset" : (render_offset_x, render_offset_y),
                 }
@@ -217,13 +218,18 @@ def parseTilesetFile(fname, imgname):
                     # tile animations don't support varrying width/height, so don't crop
                     imgrect = (int(frame[0]), int(frame[1]), int(frame[0]) + animtile[0]["image"].size[0], int(frame[1]) + animtile[0]["image"].size[1])
                     newimg = img.copy().crop(imgrect)
+                    newhash = sha.sha(newimg.tobytes()).hexdigest()
+                    if additionalinformation["animations"].get(animtile[0]["index"]) is None:
+                        additionalinformation["animations"][animtile[0]["index"]] = []
+                    additionalinformation["animations"][animtile[0]["index"]].append((newhash, frame[2]))
+
                     f = {
-                        "index" : index,
-                        "renderoffset" : None, # tile only
+                        "index" : animtile[0]["index"],
+                        "renderoffset" : animtile[0]["renderoffset"],
                         "image" : newimg,
-                        "duration" : frame[2],
-                        "oldrect" : None, # tile only
-                        "oldoffset" : None, # tile only
+                        "imagehash" : newhash,
+                        "oldrect" : animtile[0]["oldrect"],
+                        "oldoffset" : animtile[0]["oldoffset"],
                     }
                     images += [f]
 
@@ -389,19 +395,25 @@ def writeTilesetFile(animname, images, additionalinformation):
         f.write("img="+additionalinformation["imagename"])
         # f.write("\n")
 
-    prevanimindex = None
     for x in images:
-        if x["duration"] is None:
+        if (x.get("skiptile")) == True:
+            continue
+
+        f.write("\n")
+        f.write("tile=" + str(x["index"]) + "," + str(x["x"]) + "," + str(x["y"]) + "," + str(x["image"].size[0]) + "," + str(x["image"].size[1]) + "," + str(x["renderoffset"][0]) + "," + str(x["renderoffset"][1]))
+        x["skiptile"] = True
+
+        if additionalinformation["animations"].get(x["index"]) is not None:
             f.write("\n")
-            f.write("tile=" + str(x["index"]) + "," + str(x["x"]) + "," + str(x["y"]) + "," + str(x["image"].size[0]) + "," + str(x["image"].size[1]) + "," + str(x["renderoffset"][0]) + "," + str(x["renderoffset"][1]))
-            prevanimindex = None
-        else:
-            if prevanimindex is not x["index"]:
-                f.write("\n")
-                f.write("animation=" + str(x["index"]) + ";")
-                prevanimindex = x["index"]
-            else:
-                f.write(str(x["x"]) + "," + str(x["y"]) + "," + x["duration"] + ";")
+            f.write("animation=" + str(x["index"]) + ";")
+            for y in additionalinformation["animations"][x["index"]]:
+                animtile = filter(lambda s: s["imagehash"] == y[0], images)
+                if animtile is not None:
+                    f.write(str(animtile[0]["x"]) + "," + str(animtile[0]["y"]) + "," + str(y[1]) + ";")
+
+        sameid = filter(lambda s: s["index"] == x["index"], images)
+        for t in sameid:
+            t["skiptile"] = True
 
     f.close()
 
