@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # This is just a library file for the spritesheetpacker.py executable
 
 from PIL import Image
@@ -9,24 +9,24 @@ import sys
 import time
 import tempfile
 import subprocess
-import sha
+import hashlib
 
 import numpy as np
 
 try:
     os.nice(15)
 except:
-    print "not able to be nice!"
+    print("not able to be nice!")
 
 def parseAnimationFile(fname, imgname):
     images = []
     img = Image.open(imgname)
-    print 'processing ', imgname
+    print('processing ' + imgname)
 
     def processNextSection():
         images = []
         if 'position' not in globals():
-            print "Error: image detected as not compressed but has no position\n"
+            print("Error: image detected as not compressed but has no position\n")
         for index in range(0, frames):
             for direction in range(0,8):
                 x = (position + index) * render_size_x
@@ -39,9 +39,9 @@ def parseAnimationFile(fname, imgname):
                 newimg = partimg.crop(bbox)
 
                 if bbox is None:
-                    print "Warning in: ",imgname.strip('\n')
-                    print "* skipping empty image at ",(x, y, w, h)
-                    print "* position / direction is ",position, direction, '\n'
+                    print("Warning in: " + imgname.strip('\n'))
+                    print("* skipping empty image at: (" + str(x) + ", " + str(y) + ", " + str(w) + ", " + str(h) + ")")
+                    print("* position / direction is: " + str(position) + " / " + str(direction) + "\n")
                 else:
                     f = {
                         "name" : sectionname,
@@ -118,9 +118,9 @@ def parseAnimationFile(fname, imgname):
             newimg = partimg.crop(bbox)
 
             if bbox is None:
-                print "Warning in: ",imgname.strip('\n')
-                print "* skipping empty image at ",(x, y, w, h)
-                print "* direction is ", direction, '\n'
+                print("Warning in: " + imgname.strip('\n'))
+                print("* skipping empty image at: (" + str(x) + ", " + str(y) + ", " + str(w) + ", " + str(h) + ")")
+                print("* direction is: " + str(direction) + "\n")
             else:
                 f = {
                     "name" : sectionname,
@@ -152,7 +152,7 @@ def parseAnimationFile(fname, imgname):
 def parseTilesetFile(fname, imgname):
     images = []
     img = Image.open(imgname)
-    print 'processing ', imgname
+    print('processing ' + imgname)
 
     tileset = open(fname, 'r')
     lines = tileset.readlines();
@@ -182,14 +182,14 @@ def parseTilesetFile(fname, imgname):
             newimg = partimg.crop(bbox)
 
             if bbox is None:
-                print "Warning in: ",imgname.strip('\n')
-                print "* skipping empty image at ",(x, y, w, h), '\n'
+                print("Warning in: " + imgname.strip('\n'))
+                print("* skipping empty image at: (" + str(x) + ", " + str(y) + ", " + str(w) + ", " + str(h) + ")")
             else:
                 f = {
                     "index" : index,
                     "renderoffset" : (render_offset_x-bbox[0], render_offset_y-bbox[1]),
                     "image" : newimg,
-                    "imagehash" : sha.sha(newimg.tobytes()).hexdigest(),
+                    "imagehash" : hashlib.sha1(newimg.tobytes()).hexdigest(),
                     "oldrect" : oldrect, # animations can't be packed, so we'll need to restore the old size if this tile is an animation
                     "oldoffset" : (render_offset_x, render_offset_y),
                 }
@@ -202,7 +202,7 @@ def parseTilesetFile(fname, imgname):
                 line = line.rstrip("\n") + ";\n"
             vals = line.split("=")[1].split(";")
             if len(vals) >= 1:
-                animtile = filter(lambda s: s["index"] == int(vals[0]), images)
+                animtile = list(filter(lambda s: s["index"] == int(vals[0]), images))
             else:
                 continue
 
@@ -213,12 +213,12 @@ def parseTilesetFile(fname, imgname):
                 next(valstart) # skip the index
                 for animframe in valstart:
                     frame = animframe.split(",")
-                    if len(frame) is not 3:
+                    if len(frame) != 3:
                         break
                     # tile animations don't support varrying width/height, so don't crop
                     imgrect = (int(frame[0]), int(frame[1]), int(frame[0]) + animtile[0]["image"].size[0], int(frame[1]) + animtile[0]["image"].size[1])
                     newimg = img.copy().crop(imgrect)
-                    newhash = sha.sha(newimg.tobytes()).hexdigest()
+                    newhash = hashlib.sha1(newimg.tobytes()).hexdigest()
                     if additionalinformation["animations"].get(animtile[0]["index"]) is None:
                         additionalinformation["animations"][animtile[0]["index"]] = []
                     additionalinformation["animations"][animtile[0]["index"]].append((newhash, frame[2]))
@@ -240,7 +240,7 @@ def markDuplicates(images):
     gid=0
     for im in images:
         im["gid"] = gid
-        im["imagehash"] = sha.sha(im["image"].tobytes()).hexdigest()
+        im["imagehash"] = hashlib.sha1(im["image"].tobytes()).hexdigest()
         gid += 1
 
     for im1 in images:
@@ -336,7 +336,7 @@ def writeImageFile(imgname, images, size):
         assert (r["x"] + r["image"].size[0] <= size[0])
         assert (r["y"] + r["image"].size[1] <= size[1])
         result.paste(r["image"], (r["x"], r["y"]))
-    print 'Saving: ',imgname
+    print('Saving: ' + imgname)
     result.save(imgname, option = 'optimize')
 
 def writeAnimationfile(animname, images, additionalinformation):
@@ -346,7 +346,7 @@ def writeAnimationfile(animname, images, additionalinformation):
         h = max(n["y"]+n["image"].size[1], h)
 
     def write_section(name):
-        framelist = filter(lambda s: s["name"] == name, images)
+        framelist = list(filter(lambda s: s["name"] == name, images))
         f.write("\n")
         f.write("["+name+"]\n")
         if len(framelist)>0:
@@ -407,11 +407,11 @@ def writeTilesetFile(animname, images, additionalinformation):
             f.write("\n")
             f.write("animation=" + str(x["index"]) + ";")
             for y in additionalinformation["animations"][x["index"]]:
-                animtile = filter(lambda s: s["imagehash"] == y[0], images)
+                animtile = list(filter(lambda s: s["imagehash"] == y[0], images))
                 if animtile is not None:
                     f.write(str(animtile[0]["x"]) + "," + str(animtile[0]["y"]) + "," + str(y[1]) + ";")
 
-        sameid = filter(lambda s: s["index"] == x["index"], images)
+        sameid = list(filter(lambda s: s["index"] == x["index"], images))
         for t in sameid:
             t["skiptile"] = True
 
@@ -419,8 +419,8 @@ def writeTilesetFile(animname, images, additionalinformation):
 
 
 if __name__ == "__main__":
-    print "This is just a library file containing lots of functions."
-    print "Run spritesheetpacker.py instead"
+    print("This is just a library file containing lots of functions.")
+    print("Run spritesheetpacker.py instead")
 
 
 

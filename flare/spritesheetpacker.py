@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 
 from PIL import Image
 import argparse
@@ -22,10 +22,10 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     if args.mod is None and (args.animation is None or args.tileset is None):
-        print "Animation/tileset and mod path must be supplied."
+        print("Animation/tileset and mod path must be supplied.")
         exit(1)
     elif args.animation is not None and args.tileset is not None:
-        print "Can't resize both an animation and a tileset. Aborting."
+        print("Can't resize both an animation and a tileset. Aborting.")
         exit(1)
     else:
         mod = args.mod[0]
@@ -39,12 +39,16 @@ if __name__ == "__main__":
         elif args.tileset is not None:
             defname = tilesetname = args.tileset[0]
 
+        if not defname:
+            print('No animation or tileset definition. Exiting.')
+            exit(1)
+
         with open(defname) as f:
             for line in f.readlines():
                 if (animname is not None and line.startswith('image=')) or (tilesetname is not None and line.startswith('img=')):
                     imgname=mod + '/' + (line.split('=')[1]).rstrip('\n')
         if imgname == None:
-            print 'No image path found in the spritesheet definition:', defname
+            print('No image path found in the spritesheet definition: ' + defname)
             exit(1)
 
         if animname is not None:
