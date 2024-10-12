@@ -20,8 +20,12 @@ except:
 
 def parseAnimationFile(fname, imgname):
     images = []
-    img = Image.open(imgname)
+    raw_img = Image.open(imgname)
     print('processing ' + imgname)
+
+    # getbbox() requires pixels to be 0 on all channels to work properly
+    black = Image.new('RGBA', raw_img.size)
+    img = Image.composite(raw_img, black, raw_img)
 
     def processNextSection():
         images = []
@@ -151,8 +155,12 @@ def parseAnimationFile(fname, imgname):
 
 def parseTilesetFile(fname, imgname):
     images = []
-    img = Image.open(imgname)
+    raw_img = Image.open(imgname)
     print('processing ' + imgname)
+
+    # getbbox() requires pixels to be 0 on all channels to work properly
+    black = Image.new('RGBA', raw_img.size)
+    img = Image.composite(raw_img, black, raw_img)
 
     tileset = open(fname, 'r')
     lines = tileset.readlines();
