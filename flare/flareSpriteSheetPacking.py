@@ -29,7 +29,7 @@ def parseAnimationFile(fname, imgname):
 
     def processNextSection():
         images = []
-        if 'position' not in globals():
+        if 'position' not in locals():
             print("Error: image detected as not compressed but has no position\n")
         for index in range(0, frames):
             for direction in range(0,8):
