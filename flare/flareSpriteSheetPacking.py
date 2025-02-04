@@ -303,9 +303,9 @@ def findBestEnclosingRectangle(rects):
 
     tf = tempfile.mkstemp()
     if 'win' in sys.platform:
-        string = "..\\bestEnclosingRect\\rectpacker.exe " + rectPassString
+        string = sys.path[0] + "\\..\\bestEnclosingRect\\rectpacker.exe " + rectPassString
     elif sys.platform.startswith('linux'):
-        string = "../bestEnclosingRect/rectpacker " + rectPassString
+        string = sys.path[0] + "/../bestEnclosingRect/rectpacker " + rectPassString
     p = subprocess.call(string, stdout = tf[0], shell = True)
 
     filehandle = open(tf[1], 'r')
