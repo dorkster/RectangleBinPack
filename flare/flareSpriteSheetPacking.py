@@ -25,7 +25,7 @@ def parseAnimationFile(fname, imgname):
 
     # getbbox() requires pixels to be 0 on all channels to work properly
     black = Image.new('RGBA', raw_img.size)
-    img = Image.composite(raw_img, black, raw_img)
+    img = Image.alpha_composite(raw_img, black)
 
     def processNextSection():
         images = []
@@ -160,7 +160,7 @@ def parseTilesetFile(fname, imgname):
 
     # getbbox() requires pixels to be 0 on all channels to work properly
     black = Image.new('RGBA', raw_img.size)
-    img = Image.composite(raw_img, black, raw_img)
+    img = Image.alpha_composite(raw_img, black)
 
     tileset = open(fname, 'r')
     lines = tileset.readlines();
