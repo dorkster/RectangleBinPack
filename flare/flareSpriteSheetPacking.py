@@ -40,6 +40,7 @@ def parseAnimationFile(fname, imgname):
                 imgrect = (x, y, w, h)
                 partimg = img.copy().crop(imgrect)
                 bbox = partimg.split()[partimg.getbands().index('A')].getbbox()
+                roffset = (render_size_x, render_size_y)
 
                 if bbox is None:
                     print("Warning in: " + imgname.strip('\n'))
@@ -47,8 +48,7 @@ def parseAnimationFile(fname, imgname):
                     print("* name / position / direction is: " + sectionname + " / " + str(position) + " / " + str(direction))
                     print("* resizing to 1x1" + "\n")
                     bbox = (0, 0, 1, 1)
-                    render_offset_x = 0
-                    render_offset_y = 0
+                    roffset = (0, 0)
 
                 newimg = partimg.crop(bbox)
 
@@ -59,7 +59,7 @@ def parseAnimationFile(fname, imgname):
                     "index" : index,
                     "duration" : duration,
                     "frames" : frames,
-                    "renderoffset" : (render_offset_x-bbox[0], render_offset_y-bbox[1]),
+                    "renderoffset" : (roffset[0]-bbox[0], roffset[1]-bbox[1]),
                     "image" : newimg,
                     "width" : newimg.size[0],
                     "height" : newimg.size[1],
