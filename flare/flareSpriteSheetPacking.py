@@ -40,27 +40,33 @@ def parseAnimationFile(fname, imgname):
                 imgrect = (x, y, w, h)
                 partimg = img.copy().crop(imgrect)
                 bbox = partimg.split()[partimg.getbands().index('A')].getbbox()
-                newimg = partimg.crop(bbox)
 
                 if bbox is None:
                     print("Warning in: " + imgname.strip('\n'))
-                    print("* skipping empty image at: (" + str(x) + ", " + str(y) + ", " + str(w) + ", " + str(h) + ")")
-                    print("* position / direction is: " + str(position) + " / " + str(direction) + "\n")
-                else:
-                    f = {
-                        "name" : sectionname,
-                        "type" : _type,
-                        "direction" : direction,
-                        "index" : index,
-                        "duration" : duration,
-                        "frames" : frames,
-                        "renderoffset" : (render_offset_x-bbox[0], render_offset_y-bbox[1]),
-                        "image" : newimg,
-                        "width" : newimg.size[0],
-                        "height" : newimg.size[1],
-                        "active_frame" : active_frame
-                    }
-                    images += [f]
+                    print("* empty image at: (" + str(x) + ", " + str(y) + ", " + str(w) + ", " + str(h) + ")")
+                    print("* name / position / direction is: " + sectionname + " / " + str(position) + " / " + str(direction))
+                    print("* resizing to 1x1" + "\n")
+                    bbox = (0, 0, 1, 1)
+                    render_offset_x = 0
+                    render_offset_y = 0
+
+                newimg = partimg.crop(bbox)
+
+                f = {
+                    "name" : sectionname,
+                    "type" : _type,
+                    "direction" : direction,
+                    "index" : index,
+                    "duration" : duration,
+                    "frames" : frames,
+                    "renderoffset" : (render_offset_x-bbox[0], render_offset_y-bbox[1]),
+                    "image" : newimg,
+                    "width" : newimg.size[0],
+                    "height" : newimg.size[1],
+                    "active_frame" : active_frame
+                }
+                images += [f]
+
         return images
 
 
@@ -119,25 +125,30 @@ def parseAnimationFile(fname, imgname):
             imgrect = (x, y, w, h)
             partimg = img.copy().crop(imgrect)
             bbox = partimg.split()[partimg.getbands().index('A')].getbbox()
-            newimg = partimg.crop(bbox)
 
             if bbox is None:
                 print("Warning in: " + imgname.strip('\n'))
-                print("* skipping empty image at: (" + str(x) + ", " + str(y) + ", " + str(w) + ", " + str(h) + ")")
-                print("* direction is: " + str(direction) + "\n")
-            else:
-                f = {
-                    "name" : sectionname,
-                    "type" : _type,
-                    "direction" : direction,
-                    "index" : index,
-                    "duration" : duration,
-                    "frames" : frames,
-                    "renderoffset" : (render_offset_x-bbox[0], render_offset_y-bbox[1]),
-                    "image" : newimg,
-                    "active_frame" : active_frame
-                }
-                images += [f]
+                print("* empty image at: (" + str(x) + ", " + str(y) + ", " + str(w) + ", " + str(h) + ")")
+                print("* name / direction is: " + sectionname + " / " + str(direction))
+                print("* resizing to 1x1" + "\n")
+                bbox = (0, 0, 1, 1)
+                render_offset_x = 0
+                render_offset_y = 0
+
+            newimg = partimg.crop(bbox)
+
+            f = {
+                "name" : sectionname,
+                "type" : _type,
+                "direction" : direction,
+                "index" : index,
+                "duration" : duration,
+                "frames" : frames,
+                "renderoffset" : (render_offset_x-bbox[0], render_offset_y-bbox[1]),
+                "image" : newimg,
+                "active_frame" : active_frame
+            }
+            images += [f]
 
         if line.startswith("["):
             newsection = True
@@ -185,23 +196,30 @@ def parseTilesetFile(fname, imgname):
             render_offset_x = int(vals[5])
             render_offset_y = int(vals[6])
             oldrect = imgrect = (x, y, w, h)
+            oldoffset = (render_offset_x, render_offset_y)
             partimg = img.copy().crop(imgrect)
             bbox = partimg.split()[partimg.getbands().index('A')].getbbox()
-            newimg = partimg.crop(bbox)
 
             if bbox is None:
                 print("Warning in: " + imgname.strip('\n'))
-                print("* skipping empty image at: (" + str(x) + ", " + str(y) + ", " + str(w) + ", " + str(h) + ")")
-            else:
-                f = {
-                    "index" : index,
-                    "renderoffset" : (render_offset_x-bbox[0], render_offset_y-bbox[1]),
-                    "image" : newimg,
-                    "imagehash" : hashlib.sha1(newimg.tobytes()).hexdigest(),
-                    "oldrect" : oldrect, # animations can't be packed, so we'll need to restore the old size if this tile is an animation
-                    "oldoffset" : (render_offset_x, render_offset_y),
-                }
-                images += [f]
+                print("* empty image at: (" + str(x) + ", " + str(y) + ", " + str(w) + ", " + str(h) + ")")
+                print("* tile ID is: " + str(index))
+                print("* resizing to 1x1" + "\n")
+                bbox = (0, 0, 1, 1)
+                render_offset_x = 0
+                render_offset_y = 0
+
+            newimg = partimg.crop(bbox)
+
+            f = {
+                "index" : index,
+                "renderoffset" : (render_offset_x-bbox[0], render_offset_y-bbox[1]),
+                "image" : newimg,
+                "imagehash" : hashlib.sha1(newimg.tobytes()).hexdigest(),
+                "oldrect" : oldrect, # animations can't be packed, so we'll need to restore the old size if this tile is an animation
+                "oldoffset" : oldoffset,
+            }
+            images += [f]
 
         if line.startswith("animation"):
             animtile = None
@@ -210,36 +228,44 @@ def parseTilesetFile(fname, imgname):
                 line = line.rstrip("\n") + ";\n"
             vals = line.split("=")[1].split(";")
             if len(vals) >= 1:
-                animtile = list(filter(lambda s: s["index"] == int(vals[0]), images))
+                animtiles = list(filter(lambda s: s["index"] == int(vals[0]), images))
+                animtile = animtiles[0]
             else:
                 continue
 
             if animtile is not None:
-                animtile[0]["image"] = img.copy().crop(animtile[0]["oldrect"])
-                animtile[0]["renderoffset"] = animtile[0]["oldoffset"]
+                animtile["image"] = img.copy().crop(animtile["oldrect"])
+                animtile["renderoffset"] = animtile["oldoffset"]
                 valstart = iter(vals)
                 next(valstart) # skip the index
+                is_first_frame = True
                 for animframe in valstart:
                     frame = animframe.split(",")
                     if len(frame) != 3:
                         break
                     # tile animations don't support varrying width/height, so don't crop
-                    imgrect = (int(frame[0]), int(frame[1]), int(frame[0]) + animtile[0]["image"].size[0], int(frame[1]) + animtile[0]["image"].size[1])
+                    imgrect = (int(frame[0]), int(frame[1]), int(frame[0]) + animtile["image"].size[0], int(frame[1]) + animtile["image"].size[1])
                     newimg = img.copy().crop(imgrect)
                     newhash = hashlib.sha1(newimg.tobytes()).hexdigest()
-                    if additionalinformation["animations"].get(animtile[0]["index"]) is None:
-                        additionalinformation["animations"][animtile[0]["index"]] = []
-                    additionalinformation["animations"][animtile[0]["index"]].append((newhash, frame[2]))
+                    if additionalinformation["animations"].get(animtile["index"]) is None:
+                        additionalinformation["animations"][animtile["index"]] = []
+                    additionalinformation["animations"][animtile["index"]].append((newhash, frame[2]))
 
                     f = {
-                        "index" : animtile[0]["index"],
-                        "renderoffset" : animtile[0]["renderoffset"],
+                        "index" : animtile["index"],
+                        "renderoffset" : animtile["renderoffset"],
                         "image" : newimg,
                         "imagehash" : newhash,
-                        "oldrect" : animtile[0]["oldrect"],
-                        "oldoffset" : animtile[0]["oldoffset"],
+                        "oldrect" : animtile["oldrect"],
+                        "oldoffset" : animtile["oldoffset"],
                     }
                     images += [f]
+
+                    # the tile that points to an animation should be the first frame of said animation
+                    if is_first_frame:
+                        is_first_frame = False
+                        animtile["image"] = newimg.copy()
+                        animtile["imagehash"] = hashlib.sha1(newimg.tobytes()).hexdigest()
 
     return images, additionalinformation
 
