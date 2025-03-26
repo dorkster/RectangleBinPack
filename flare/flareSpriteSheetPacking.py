@@ -40,7 +40,7 @@ def parseAnimationFile(fname, imgname):
                 imgrect = (x, y, w, h)
                 partimg = img.copy().crop(imgrect)
                 bbox = partimg.split()[partimg.getbands().index('A')].getbbox()
-                roffset = (render_size_x, render_size_y)
+                roffset = (render_offset_x, render_offset_y)
 
                 if bbox is None:
                     print("Warning in: " + imgname.strip('\n'))
