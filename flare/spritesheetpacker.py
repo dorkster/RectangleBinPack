@@ -62,7 +62,7 @@ if __name__ == "__main__":
             imgs = flareSpriteSheetPacking.resizeImages(imgs)
 
         rects = flareSpriteSheetPacking.extractRects(imgs)
-        newrects = flareSpriteSheetPacking.findBestEnclosingRectangle(rects)
+        newrects = flareSpriteSheetPacking.findBestEnclosingRectangle(rects, additionalinformation)
         imgrects = flareSpriteSheetPacking.matchRects(newrects, imgrects)
 
         size = flareSpriteSheetPacking.calculateImageSize(imgrects)

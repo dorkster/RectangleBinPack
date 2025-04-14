@@ -76,12 +76,20 @@ def parseAnimationFile(fname, imgname):
 
     additionalinformation = {}
     additionalinformation["original_image_size"] = img.size
+    additionalinformation["cached_input"] = ''
+    additionalinformation["cached_output"] = ''
 
     firstsection = True
     newsection = False
     compressedloading = False
     active_frame = None
     for line in lines:
+        if line.startswith("#flare_sprite_packer_input="):
+            additionalinformation["cached_input"] = line.split("=")[1].strip()
+
+        if line.startswith("#flare_sprite_packer_output="):
+            additionalinformation["cached_output"] = line.split("=")[1].strip()
+
         if line.startswith("image="):
             imgname = line.split("=")[1] # keep this information to write out again!
             additionalinformation["imagename"] = imgname
@@ -180,8 +188,16 @@ def parseTilesetFile(fname, imgname):
     additionalinformation = {}
     additionalinformation["original_image_size"] = img.size
     additionalinformation["animations"] = {}
+    additionalinformation["cached_input"] = ''
+    additionalinformation["cached_output"] = ''
 
     for line in lines:
+        if line.startswith("#flare_sprite_packer_input="):
+            additionalinformation["cached_input"] = line.split("=")[1].strip()
+
+        if line.startswith("#flare_sprite_packer_output="):
+            additionalinformation["cached_output"] = line.split("=")[1].strip()
+
         if line.startswith("img="):
             imgname = line.split("=")[1] # keep this information to write out again!
             additionalinformation["imagename"] = imgname
@@ -322,21 +338,42 @@ def extractRects(images):
             ret += [r]
     return ret
 
-def findBestEnclosingRectangle(rects):
+def findBestEnclosingRectangle(rects, additionalinformation):
     rectPassString = ""
     for rect in sorted(rects, key = lambda x: x["index"]):
         rectPassString += " " + str(rect["width"]) + " " + str(rect["height"])
 
-    tf = tempfile.mkstemp()
-    if 'win' in sys.platform:
-        string = sys.path[0] + "\\..\\bestEnclosingRect\\rectpacker.exe " + rectPassString
-    elif sys.platform.startswith('linux'):
-        string = sys.path[0] + "/../bestEnclosingRect/rectpacker " + rectPassString
-    p = subprocess.call(string, stdout = tf[0], shell = True)
+    cache_input = rectPassString.strip()
+    if additionalinformation["cached_input"] != "" and additionalinformation["cached_output"] != "" and cache_input == additionalinformation["cached_input"]:
+        # cache found, use it to populate positions
+        print("Cache found! Skipping rectpacker.")
+        positions = []
+        rect_coords = additionalinformation["cached_output"].split()
+        assert(len(rect_coords) % 2 == 0)
+        for i in range(0, len(rect_coords), 2):
+            positions.append(rect_coords[i] + ' ' + rect_coords[i+1])
+    else:
+        # no cache found, run the packer binary
+        print("No cache found. Running rectpacker...")
+        tf = tempfile.mkstemp()
+        if 'win' in sys.platform:
+            string = sys.path[0] + "\\..\\bestEnclosingRect\\rectpacker.exe " + rectPassString
+        elif sys.platform.startswith('linux'):
+            string = sys.path[0] + "/../bestEnclosingRect/rectpacker " + rectPassString
+        p = subprocess.call(string, stdout = tf[0], shell = True)
 
-    filehandle = open(tf[1], 'r')
-    positions = filehandle.readlines()
-    filehandle.close()
+        filehandle = open(tf[1], 'r')
+        positions = filehandle.readlines()
+        filehandle.close()
+
+        # create cache
+        cache_output = ""
+        for pos in positions:
+            cache_output += pos.strip() + ' '
+        cache_output = cache_output.rstrip()
+
+        additionalinformation["cached_input"] = cache_input
+        additionalinformation["cached_output"] = cache_output
 
     for pos, rect in zip(positions, rects):
         rect["x"] = int(pos.split()[0])
@@ -406,6 +443,11 @@ def writeAnimationfile(animname, images, additionalinformation):
 
     f = open(animname,'w')
 
+    # cache
+    if additionalinformation["cached_input"] and additionalinformation["cached_output"]:
+        f.write("#flare_sprite_packer_input=" + additionalinformation["cached_input"]+"\n")
+        f.write("#flare_sprite_packer_output=" + additionalinformation["cached_output"]+"\n\n")
+
     if "imagename" in additionalinformation:
         f.write("\n")
         f.write("image="+additionalinformation["imagename"])
@@ -414,6 +456,7 @@ def writeAnimationfile(animname, images, additionalinformation):
     write_section(firstsection)
     for section in sectionnames:
         write_section(section)
+
     f.close()
 
 def writeTilesetFile(animname, images, additionalinformation):
@@ -423,6 +466,11 @@ def writeTilesetFile(animname, images, additionalinformation):
         h = max(n["y"]+n["image"].size[1], h)
 
     f = open(animname,'w')
+
+    # cache
+    if additionalinformation["cached_input"] and additionalinformation["cached_output"]:
+        f.write("#flare_sprite_packer_input=" + additionalinformation["cached_input"]+"\n")
+        f.write("#flare_sprite_packer_output=" + additionalinformation["cached_output"]+"\n\n")
 
     if "imagename" in additionalinformation:
         f.write("\n")
