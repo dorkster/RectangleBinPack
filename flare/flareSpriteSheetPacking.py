@@ -13,6 +13,8 @@ import hashlib
 
 import numpy as np
 
+DEFAULT_IMG_ID = '_default_'
+
 try:
     os.nice(15)
 except:
@@ -20,8 +22,8 @@ except:
 
 def parseAnimationFile(fname, imgname):
     images = []
-    raw_img = Image.open(imgname)
-    print('processing ' + imgname)
+    raw_img = Image.open(imgname[0])
+    print('processing ' + imgname[0])
 
     # getbbox() requires pixels to be 0 on all channels to work properly
     black = Image.new('RGBA', raw_img.size)
@@ -31,6 +33,9 @@ def parseAnimationFile(fname, imgname):
         images = []
         if 'position' not in locals():
             print("Error: image detected as not compressed but has no position\n")
+        if imgname[2] != DEFAULT_IMG_ID:
+            print("Error: image has ID, but section is not compressed\n")
+            return
         for index in range(0, frames):
             for direction in range(0,8):
                 x = (position + index) * render_size_x
@@ -43,7 +48,7 @@ def parseAnimationFile(fname, imgname):
                 roffset = (render_offset_x, render_offset_y)
 
                 if bbox is None:
-                    print("Warning in: " + imgname.strip('\n'))
+                    print("Warning in: " + imgname[1])
                     print("* empty image at: (" + str(x) + ", " + str(y) + ", " + str(w) + ", " + str(h) + ")")
                     print("* name / position / direction is: " + sectionname + " / " + str(position) + " / " + str(direction))
                     print("* resizing to 1x1" + "\n")
@@ -64,7 +69,8 @@ def parseAnimationFile(fname, imgname):
                     "width" : newimg.size[0],
                     "height" : newimg.size[1],
                     "active_frame" : active_frame,
-                    "active_sub_frame": active_sub_frame
+                    "active_sub_frame": active_sub_frame,
+                    "frametag": ""
                 }
                 images += [f]
 
@@ -79,6 +85,7 @@ def parseAnimationFile(fname, imgname):
     additionalinformation["original_image_size"] = img.size
     additionalinformation["cached_input"] = ''
     additionalinformation["cached_output"] = ''
+    additionalinformation["imagename"] = imgname
 
     firstsection = True
     newsection = False
@@ -91,10 +98,6 @@ def parseAnimationFile(fname, imgname):
 
         if line.startswith("#flare_sprite_packer_output="):
             additionalinformation["cached_output"] = line.split("=")[1].strip()
-
-        if line.startswith("image="):
-            imgname = line.split("=")[1] # keep this information to write out again!
-            additionalinformation["imagename"] = imgname
 
         if line.startswith("render_size"):
             value = line.split("=")[1]
@@ -135,34 +138,42 @@ def parseAnimationFile(fname, imgname):
             h = y + int(vals[5])
             render_offset_x = int(vals[6])
             render_offset_y = int(vals[7])
-            imgrect = (x, y, w, h)
-            partimg = img.copy().crop(imgrect)
-            bbox = partimg.split()[partimg.getbands().index('A')].getbbox()
 
-            if bbox is None:
-                print("Warning in: " + imgname.strip('\n'))
-                print("* empty image at: (" + str(x) + ", " + str(y) + ", " + str(w) + ", " + str(h) + ")")
-                print("* name / direction is: " + sectionname + " / " + str(direction))
-                print("* resizing to 1x1" + "\n")
-                bbox = (0, 0, 1, 1)
-                render_offset_x = 0
-                render_offset_y = 0
+            if len(vals) > 8:
+                frametag = vals[8].rstrip('\n')
+            else:
+                frametag = ""
 
-            newimg = partimg.crop(bbox)
+            if (frametag == "" and imgname[2] == DEFAULT_IMG_ID) or (imgname[2] != DEFAULT_IMG_ID and imgname[2] == frametag):
+                imgrect = (x, y, w, h)
+                partimg = img.copy().crop(imgrect)
+                bbox = partimg.split()[partimg.getbands().index('A')].getbbox()
 
-            f = {
-                "name" : sectionname,
-                "type" : _type,
-                "direction" : direction,
-                "index" : index,
-                "duration" : duration,
-                "frames" : frames,
-                "renderoffset" : (render_offset_x-bbox[0], render_offset_y-bbox[1]),
-                "image" : newimg,
-                "active_frame" : active_frame,
-                "active_sub_frame" : active_sub_frame
-            }
-            images += [f]
+                if bbox is None:
+                    print("Warning in: " + imgname[1])
+                    print("* empty image at: (" + str(x) + ", " + str(y) + ", " + str(w) + ", " + str(h) + ")")
+                    print("* name / direction is: " + sectionname + " / " + str(direction))
+                    print("* resizing to 1x1" + "\n")
+                    bbox = (0, 0, 1, 1)
+                    render_offset_x = 0
+                    render_offset_y = 0
+
+                newimg = partimg.crop(bbox)
+
+                f = {
+                    "name" : sectionname,
+                    "type" : _type,
+                    "direction" : direction,
+                    "index" : index,
+                    "duration" : duration,
+                    "frames" : frames,
+                    "renderoffset" : (render_offset_x-bbox[0], render_offset_y-bbox[1]),
+                    "image" : newimg,
+                    "active_frame" : active_frame,
+                    "active_sub_frame" : active_sub_frame,
+                    "frametag": frametag,
+                }
+                images += [f]
 
         if line.startswith("["):
             newsection = True
@@ -176,10 +187,12 @@ def parseAnimationFile(fname, imgname):
 
     if not compressedloading:
         images += processNextSection()
-    return images, additionalinformation
+    return [images, additionalinformation]
 
 def parseTilesetFile(fname, imgname):
     images = []
+    # imgtag = imgname[1]
+    imgname = imgname[0]
     raw_img = Image.open(imgname)
     print('processing ' + imgname)
 
@@ -413,14 +426,10 @@ def writeImageFile(imgname, images, size):
         assert (r["x"] + r["image"].size[0] <= size[0])
         assert (r["y"] + r["image"].size[1] <= size[1])
         result.paste(r["image"], (r["x"], r["y"]))
-    print('Saving: ' + imgname)
-    result.save(imgname, option = 'optimize')
+    print('Saving: ' + imgname[0])
+    result.save(imgname[0], option = 'optimize')
 
-def writeAnimationfile(animname, images, additionalinformation):
-    w, h = 0, 0
-    for n in images:
-        w = max(n["x"]+n["image"].size[0], w)
-        h = max(n["y"]+n["image"].size[1], h)
+def writeAnimationfile(animname, imgnames, parsed_data):
 
     def write_section(name):
         framelist = list(filter(lambda s: s["name"] == name, images))
@@ -436,34 +445,53 @@ def writeAnimationfile(animname, images, additionalinformation):
                 f.write("active_sub_frame="+str(framelist[0]["active_sub_frame"])+"\n")
             for x in framelist:
                 #frame=index,direction,x,y,w,h,offsetx,offsety
-                f.write("frame=" + str(x["index"]) + "," + str(x["direction"]) + "," + str(x["x"]) + "," + str(x["y"]) + "," + str(x["image"].size[0]) + "," + str(x["image"].size[1]) + "," + str(x["renderoffset"][0]) + "," + str(x["renderoffset"][1]) + "\n")
+                f.write("frame=" + str(x["index"]) + "," + str(x["direction"]) + "," + str(x["x"]) + "," + str(x["y"]) + "," + str(x["image"].size[0]) + "," + str(x["image"].size[1]) + "," + str(x["renderoffset"][0]) + "," + str(x["renderoffset"][1]))
+                if x["frametag"] != "":
+                    f.write(',' + x["frametag"])
+                f.write('\n')
         else:
             f.write("frames=1\n")
             f.write("duration=1s\n")
             f.write("type=back_forth\n")
 
-    firstsection = additionalinformation["firstsection"]
-    sectionnames = {}
-    for f in images:
-        sectionnames[f["name"]] = True
-    if firstsection in sectionnames:
-        del sectionnames[firstsection]
 
     f = open(animname,'w')
 
-    # cache
-    if additionalinformation["cached_input"] and additionalinformation["cached_output"]:
-        f.write("#flare_sprite_packer_input=" + additionalinformation["cached_input"]+"\n")
-        f.write("#flare_sprite_packer_output=" + additionalinformation["cached_output"]+"\n\n")
-
-    if "imagename" in additionalinformation:
+    for imgname in imgnames:
+        imgid = imgname[2]
+        f.write("image=" + imgname[1])
+        if imgname[2] != DEFAULT_IMG_ID:
+            f.write(',' + imgname[2])
         f.write("\n")
-        f.write("image="+additionalinformation["imagename"])
-        #f.write("\n")
 
-    write_section(firstsection)
-    for section in sectionnames:
-        write_section(section)
+    for imgname in imgnames:
+        imgid = imgname[2]
+        images = parsed_data[imgid][0]
+        extra = parsed_data[imgid][1]
+
+        # cache
+        # TODO support cache for multi-image animations
+        single_img = (len(imgnames) == 1 and imgid == DEFAULT_IMG_ID)
+
+        if single_img and extra["cached_input"] and extra["cached_output"]:
+            f.write("#flare_sprite_packer_input=" + extra["cached_input"]+"\n")
+            f.write("#flare_sprite_packer_output=" + extra["cached_output"]+"\n\n")
+
+        # w, h = 0, 0
+        # for n in images:
+        #     w = max(n["x"]+n["image"].size[0], w)
+        #     h = max(n["y"]+n["image"].size[1], h)
+
+        firstsection = extra["firstsection"]
+        sectionnames = {}
+        for img in images:
+            sectionnames[img["name"]] = True
+        # if firstsection in sectionnames:
+        #     del sectionnames[firstsection]
+
+        # write_section(firstsection)
+        for section in sectionnames:
+            write_section(section)
 
     f.close()
 

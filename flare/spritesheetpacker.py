@@ -29,7 +29,7 @@ if __name__ == "__main__":
         exit(1)
     else:
         mod = args.mod[0]
-        imgname = None
+        imgnames = []
 
         animname = None
         tilesetname = None
@@ -45,32 +45,47 @@ if __name__ == "__main__":
 
         with open(defname) as f:
             for line in f.readlines():
-                if (animname is not None and line.startswith('image=')) or (tilesetname is not None and line.startswith('img=')):
-                    imgname=mod + '/' + (line.split('=')[1]).rstrip('\n')
-        if imgname == None:
+                if (animname is not None and line.startswith('image=')):
+                    img_string = line.split('=')[1].rstrip('\n')
+                    img_fields = img_string.split(',')
+                    if len(img_fields) > 1:
+                        imgnames.append((mod + '/' + img_fields[0], img_fields[0], img_fields[1]))
+                    else:
+                        imgnames.append((mod + '/' + img_fields[0], img_fields[0], flareSpriteSheetPacking.DEFAULT_IMG_ID))
+                elif (tilesetname is not None and line.startswith('img=')):
+                    # TODO support tilesets with multiple images
+                    img_string = line.split('=')[1].rstrip('\n')
+                    imgnames = [(mod + '/' + img_string, img_string, flareSpriteSheetPacking.DEFAULT_IMG_ID)]
+        if len(imgnames) == 0:
             print('No image path found in the spritesheet definition: ' + defname)
             exit(1)
 
-        if animname is not None:
-            imgrects, additionalinformation = flareSpriteSheetPacking.parseAnimationFile(animname, imgname)
-        elif tilesetname is not None:
-            imgrects, additionalinformation = flareSpriteSheetPacking.parseTilesetFile(tilesetname, imgname)
+        parsed_data = {}
 
-        imgs = flareSpriteSheetPacking.markDuplicates(imgrects)
+        for imgname in imgnames:
+            imgid = imgname[2]
 
-        if args.resize:
-            imgs = flareSpriteSheetPacking.resizeImages(imgs)
-
-        rects = flareSpriteSheetPacking.extractRects(imgs)
-        newrects = flareSpriteSheetPacking.findBestEnclosingRectangle(rects, additionalinformation)
-        imgrects = flareSpriteSheetPacking.matchRects(newrects, imgrects)
-
-        size = flareSpriteSheetPacking.calculateImageSize(imgrects)
-        oldsize = additionalinformation["original_image_size"]
-
-        if args.save_always or (size[0] * size[1] < oldsize[0] * oldsize[1]):
-            flareSpriteSheetPacking.writeImageFile(imgname, imgrects, size)
             if animname is not None:
-                flareSpriteSheetPacking.writeAnimationfile(animname, imgrects, additionalinformation)
+                parsed_data[imgid] = flareSpriteSheetPacking.parseAnimationFile(animname, imgname)
             elif tilesetname is not None:
-                flareSpriteSheetPacking.writeTilesetFile(tilesetname, imgrects, additionalinformation)
+                parsed_data[imgid] = flareSpriteSheetPacking.parseTilesetFile(tilesetname, imgname)
+
+            imgs = flareSpriteSheetPacking.markDuplicates(parsed_data[imgid][0])
+
+            if args.resize:
+                imgs = flareSpriteSheetPacking.resizeImages(imgs)
+
+            rects = flareSpriteSheetPacking.extractRects(imgs)
+            newrects = flareSpriteSheetPacking.findBestEnclosingRectangle(rects, parsed_data[imgid][1])
+            parsed_data[imgid][0] = flareSpriteSheetPacking.matchRects(newrects, parsed_data[imgid][0])
+
+            size = flareSpriteSheetPacking.calculateImageSize(parsed_data[imgid][0])
+            oldsize = parsed_data[imgid][1]["original_image_size"]
+
+            if args.save_always or (size[0] * size[1] < oldsize[0] * oldsize[1]):
+                flareSpriteSheetPacking.writeImageFile(imgname, parsed_data[imgid][0], size)
+
+        if animname is not None:
+            flareSpriteSheetPacking.writeAnimationfile(animname, imgnames, parsed_data)
+        elif tilesetname is not None:
+            flareSpriteSheetPacking.writeTilesetFile(tilesetname, imgnames, parsed_data)
