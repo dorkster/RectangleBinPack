@@ -302,7 +302,7 @@ def parseTilesetFile(fname, imgname):
                         animtile["image"] = newimg.copy()
                         animtile["imagehash"] = hashlib.sha1(newimg.tobytes()).hexdigest()
 
-    return images, additionalinformation
+    return [images, additionalinformation]
 
 def markDuplicates(images):
     # assign global unique ids to each image:
@@ -477,61 +477,53 @@ def writeAnimationfile(animname, imgnames, parsed_data):
             f.write("#flare_sprite_packer_input=" + extra["cached_input"]+"\n")
             f.write("#flare_sprite_packer_output=" + extra["cached_output"]+"\n\n")
 
-        # w, h = 0, 0
-        # for n in images:
-        #     w = max(n["x"]+n["image"].size[0], w)
-        #     h = max(n["y"]+n["image"].size[1], h)
-
         firstsection = extra["firstsection"]
         sectionnames = {}
         for img in images:
             sectionnames[img["name"]] = True
-        # if firstsection in sectionnames:
-        #     del sectionnames[firstsection]
 
-        # write_section(firstsection)
         for section in sectionnames:
             write_section(section)
 
     f.close()
 
-def writeTilesetFile(animname, images, additionalinformation):
-    w, h = 0, 0
-    for n in images:
-        w = max(n["x"]+n["image"].size[0], w)
-        h = max(n["y"]+n["image"].size[1], h)
-
+def writeTilesetFile(animname, imgnames, parsed_data):
     f = open(animname,'w')
 
-    # cache
-    if additionalinformation["cached_input"] and additionalinformation["cached_output"]:
-        f.write("#flare_sprite_packer_input=" + additionalinformation["cached_input"]+"\n")
-        f.write("#flare_sprite_packer_output=" + additionalinformation["cached_output"]+"\n\n")
+    for imgname in imgnames:
+        imgid = imgname[2]
+        images = parsed_data[imgid][0]
+        extra = parsed_data[imgid][1]
 
-    if "imagename" in additionalinformation:
-        f.write("\n")
-        f.write("img="+additionalinformation["imagename"])
-        # f.write("\n")
+        # cache
+        # TODO support cache for multi-image animations
+        single_img = (len(imgnames) == 1 and imgid == DEFAULT_IMG_ID)
 
-    for x in images:
-        if (x.get("skiptile")) == True:
-            continue
+        f.write('[tileset]\n')
+        f.write('img=' + imgname[1] + '\n')
+        if single_img and extra["cached_input"] and extra["cached_output"]:
+            f.write("#flare_sprite_packer_input=" + extra["cached_input"]+"\n")
+            f.write("#flare_sprite_packer_output=" + extra["cached_output"]+"\n")
 
-        f.write("\n")
-        f.write("tile=" + str(x["index"]) + "," + str(x["x"]) + "," + str(x["y"]) + "," + str(x["image"].size[0]) + "," + str(x["image"].size[1]) + "," + str(x["renderoffset"][0]) + "," + str(x["renderoffset"][1]))
-        x["skiptile"] = True
+        for x in images:
+            if (x.get("skiptile")) == True:
+                continue
 
-        if additionalinformation["animations"].get(x["index"]) is not None:
+            f.write("tile=" + str(x["index"]) + "," + str(x["x"]) + "," + str(x["y"]) + "," + str(x["image"].size[0]) + "," + str(x["image"].size[1]) + "," + str(x["renderoffset"][0]) + "," + str(x["renderoffset"][1]))
             f.write("\n")
-            f.write("animation=" + str(x["index"]) + ";")
-            for y in additionalinformation["animations"][x["index"]]:
-                animtile = list(filter(lambda s: s["imagehash"] == y[0], images))
-                if animtile is not None:
-                    f.write(str(animtile[0]["x"]) + "," + str(animtile[0]["y"]) + "," + str(y[1]) + ";")
+            x["skiptile"] = True
 
-        sameid = list(filter(lambda s: s["index"] == x["index"], images))
-        for t in sameid:
-            t["skiptile"] = True
+            if extra["animations"].get(x["index"]) is not None:
+                f.write("animation=" + str(x["index"]) + ";")
+                for y in extra["animations"][x["index"]]:
+                    animtile = list(filter(lambda s: s["imagehash"] == y[0], images))
+                    if animtile is not None:
+                        f.write(str(animtile[0]["x"]) + "," + str(animtile[0]["y"]) + "," + str(y[1]) + ";")
+                f.write("\n")
+
+            sameid = list(filter(lambda s: s["index"] == x["index"], images))
+            for t in sameid:
+                t["skiptile"] = True
 
     f.close()
 
